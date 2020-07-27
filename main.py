@@ -55,6 +55,7 @@ with open(inputFile, 'r') as myfile:
 inputParameters                     = json.loads(data)
 
 # Get input parameters
+"This needs to be reordered"
 dates                               = inputParameters["dates"]
 sat_list                            = inputParameters["satList"]    
 sitename                            = inputParameters["name"]
