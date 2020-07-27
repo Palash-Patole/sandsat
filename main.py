@@ -54,34 +54,33 @@ with open(inputFile, 'r') as myfile:
 # parse file
 inputParameters                     = json.loads(data)
 
-# Get input parameters
-"This needs to be reordered"
-dates                               = inputParameters["dates"]
-sat_list                            = inputParameters["satList"]    
-sitename                            = inputParameters["name"]
-inputGeoJsonFilePath                = inputParameters["studyAreaGeoJsonPath"]
-cloudMaskIssueFlag                  = inputParameters["cloudMaskIssueFlag"]
-dirtyHackFlag                       = inputParameters["dirtyHackFlag"]
-sandColor                           = inputParameters["sandColor"]
-cloudThresh                         = inputParameters["cloudThresh"]
-cloudThreshMonteCarlo               = inputParameters["cloudThreshMonteCarlo"]
-outputEpsg                          = inputParameters["outputEpsg"]
-checkDetection                      = inputParameters["checkDetection"]
-saveFigure                          = inputParameters["saveFigure"]
-colorStyle                          = inputParameters["colorStyle"]
-minBeachArea                        = inputParameters["minBeachArea"]
-minBeachAreaMonteCarlo              = inputParameters["minBeachAreaMonteCarlo"]
-bufferSize                          = inputParameters["bufferSize"] 
-bufferSizeMonteCarlo                = inputParameters["bufferSizeMonteCarlo"] 
-minLengthSl                         = inputParameters["minLengthSl"] 
-minLengthSlMonteCarlo               = inputParameters["minLengthMonteCarlo"] 
-maximumDistanceReference            = inputParameters["maximumDistanceReference"] 
-maximumDistanceReferenceMonteCarlo  = inputParameters["maximumDistanceReferenceMonteCarlo"] 
-numberOfMonteCarloSimulations       = inputParameters["numberOfMonteCarloSimulations"]
-videoOutputFlag                     = inputParameters["videoOutputFlag"]
-saveJpgPreprocessFlag               = inputParameters["saveJpgPreprocessFlag"]
-referenceGeoJsonFiles               = inputParameters["referenceGeoJsonFiles"]
-transectSettings                    = inputParameters["transectSettings"]
+# Get input parameters, #<int> comment represents the old order of reading each of these parameters
+sitename                            = inputParameters["name"] #3
+dates                               = inputParameters["dates"] #1
+sat_list                            = inputParameters["satList"] #2    
+inputGeoJsonFilePath                = inputParameters["studyAreaGeoJsonPath"] #4
+dirtyHackFlag                       = inputParameters["dirtyHackFlag"] #6
+outputEpsg                          = inputParameters["outputEpsg"] #10
+checkDetection                      = inputParameters["checkDetection"] #11
+saveFigure                          = inputParameters["saveFigure"] #12
+colorStyle                          = inputParameters["colorStyle"] #13
+cloudMaskIssueFlag                  = inputParameters["cloudMaskIssueFlag"] #5
+sandColor                           = inputParameters["sandColor"] #7
+referenceGeoJsonFiles               = inputParameters["referenceGeoJsonFiles"] #25
+transectSettings                    = inputParameters["transectSettings"] #26
+cloudThresh                         = inputParameters["cloudThresh"] #8
+cloudThreshMonteCarlo               = inputParameters["cloudThreshMonteCarlo"] #9
+minBeachArea                        = inputParameters["minBeachArea"] #14
+minBeachAreaMonteCarlo              = inputParameters["minBeachAreaMonteCarlo"] #15
+bufferSize                          = inputParameters["bufferSize"]  #16
+bufferSizeMonteCarlo                = inputParameters["bufferSizeMonteCarlo"] #17 
+minLengthSl                         = inputParameters["minLengthSl"] #18
+minLengthSlMonteCarlo               = inputParameters["minLengthMonteCarlo"] #19 
+maximumDistanceReference            = inputParameters["maximumDistanceReference"] #20 
+maximumDistanceReferenceMonteCarlo  = inputParameters["maximumDistanceReferenceMonteCarlo"] #21
+numberOfMonteCarloSimulations       = inputParameters["numberOfMonteCarloSimulations"] #22
+videoOutputFlag                     = inputParameters["videoOutputFlag"] #23
+saveJpgPreprocessFlag               = inputParameters["saveJpgPreprocessFlag"] #24
 
 # Print the variables
 print("Dates for analysis:                      ", dates)
@@ -243,17 +242,17 @@ print("")
 
 # To plot the shorelines from the output. 
 # <<< NOT NEEDEED since it is being done in post-processing.
-# fig = plt.figure()
-# plt.axis('equal')
-# plt.xlabel('Eastings')
-# plt.ylabel('Northings')
-# plt.grid(linestyle=':', color='0.5')
-# for i in range(len(output['shorelines'])):
-#     sl = output['shorelines'][i]
-#     date = output['dates'][i]
-#     plt.plot(sl[:,0], sl[:,1], '.', label=date.strftime('%d-%m-%Y'))
-# plt.legend()
-# mng = plt.get_current_fig_manager()                                         
-# mng.window.showMaximized()    
-# fig.set_size_inches([15.76,  8.52])
+fig = plt.figure()
+plt.axis('equal')
+plt.xlabel('Eastings')
+plt.ylabel('Northings')
+plt.grid(linestyle=':', color='0.5')
+for i in range(len(output['shorelines'])):
+    sl = output['shorelines'][i]
+    date = output['dates'][i]
+    plt.plot(sl[:,0], sl[:,1], '.', label=date.strftime('%d-%m-%Y'))
+plt.legend()
+mng = plt.get_current_fig_manager()                                         
+mng.window.showMaximized()    
+fig.set_size_inches([15.76,  8.52])
 
