@@ -329,7 +329,7 @@ class SDS_TSforecast:
                     predictions.predicted_mean.plot(ax=ax, label='Predicted values', color='r', lw =1, alpha=.7, figsize=(14, 7))
                     ax.fill_between(pred_ci.index,
                                     pred_ci.iloc[:, 0],
-                                    pred_ci.iloc[:, 1], color='k', alpha=.2)
+                                    pred_ci.iloc[:, 1], color='k', alpha=.2,label = 'Uncertainity')
                     ax.set_ylabel('Shoreline location [m]') 
                     ax.set_xlabel('')
                     title = "Validating predictions with "+ self.method + " model"
@@ -340,6 +340,29 @@ class SDS_TSforecast:
                     plt.savefig(filePathGenerator()+"Predicted_time_series.png",transparent=False)
                     
         return self.__results
+    
+    
+    def forecast(self,steps=12,plotForecast=False):
+        if (self.method=='SARIMA'):
+            # Forecasting for a given number of steps
+            pred_uc = self.__results.get_forecast(steps)
+            
+            if plotForecast==True:
+                plt.figure()
+                pred_ci = pred_uc.conf_int()
+                ax= self.TS.plot(label='Observed values', figsize=(14, 7), color = 'k', lw = 1)
+                pred_uc.predicted_mean.plot(ax=ax, label='Forecasted values', color = 'r', lw = 1)
+                ax.fill_between(pred_ci.index,
+                                pred_ci.iloc[:, 0],
+                                pred_ci.iloc[:, 1], color='m', alpha=.25, label = 'Uncertainity')
+                ax.set_xlabel('')
+                ax.set_ylabel('Shoreline location [m]')
+                plt.legend(loc = 'upper left')
+                plt.grid()
+                plt.savefig(filePathGenerator()+'Forecasted_time_series.png', transparent = False)
+                plt.show()
+             
+            return pred_uc
             
 
 #####################################################
@@ -389,4 +412,6 @@ Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
 results= Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
 
 
-#%%
+#%% Re-training the model over the complete data and forecasting
+Object.fitmodel()
+Forecast_results = Object.forecast(steps=12,plotForecast=True)
