@@ -18,6 +18,7 @@ To do:
         g. [To do] Auto arima, GS, manual setting for the ARIMA
         h. [To do] Add values of RMSE and mean value of the series on predictions plot
         i. [To do] Add description for all classes and methods
+        j. [To do] RNN based forecast method- initial setup
         
 """
 
@@ -45,6 +46,13 @@ from IPython.display import display
 from sklearn.metrics import mean_squared_error
 from statsmodels.tools.eval_measures import rmse
 
+# For LSTM based model
+from sklearn.preprocessing import MinMaxScaler
+from keras.preprocessing.sequence import TimeseriesGenerator
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import LSTM
+
 
 #####################################################
 ########## Setting parameters for plotting ##########
@@ -70,7 +78,7 @@ def filePathGenerator():
 #####################################################
 ########## Reading the time series data #############
 #####################################################
-def read_timeSeries(transectName,plotTimeseries=False,resampling='none'):
+def read_timeSeries(transectName,plotTimeseries=False,resampling='none',readMethod='new'):
     """
     Add description.
     
@@ -84,10 +92,17 @@ def read_timeSeries(transectName,plotTimeseries=False,resampling='none'):
     Add information here.
     
     """
-    
-    file_name = '../data/transect_time_series.csv'
-    Transects = pd.read_csv(file_name,index_col='dates',parse_dates=True)
-    Transects.drop('Unnamed: 0', axis =1, inplace = True)
+    if (readMethod=='new'): 
+        file_name = '../data/transect_time_series.csv'
+        Transects = pd.read_csv(file_name,index_col='dates',parse_dates=True)
+        Transects.drop('Unnamed: 0', axis =1, inplace = True)
+    elif (readMethod=='Old'): # Added 7th August to keep the old method of reading time-series used in Amin's notebook
+        file_name = '../data/transect_time_series.csv'
+        Transects = pd.read_csv(file_name)
+        Transects['Date_Time'] = pd.to_datetime(Transects['dates'])
+        Transects.set_index('Date_Time',inplace=True)
+        Transects.drop('dates', axis =1, inplace = True)
+        Transects.drop('Unnamed: 0', axis =1, inplace = True)
     
     # Error handling for selected transect name
     pass
@@ -106,7 +121,7 @@ def read_timeSeries(transectName,plotTimeseries=False,resampling='none'):
     # Information about the selected transect
     print("\nTime series is selected for the transect: ",transectName)
     TimeSeries = Transects[transectName]
-    # TimeSeries2 = Transects.ix[:,transectName]
+    # TimeSeries = Transects.ix[:,transectName]
     # print(type(TimeSeries),type(TimeSeries2))
     
     # Plotting the original time series for selected transect
@@ -209,14 +224,18 @@ def seasonal_decompose(timeSeries,model='add',plotDecomposition=False):
 
 #%%
 #####################################################
-######### Class for time series forecast ############
+######### Class for time series analysis ############
 #####################################################
 
-class SDS_TSforecast:
+class SDS_tsa:
     
     def __init__(self,TS,method):
         self.method = method
         self.TS = TS
+        
+        # error handling 
+        assert((self.method=='SARIMA') or (self.method=='LSTM')),"The specified forecast method is not supported."
+        
         
     def setParameters(self,setting='auto_arima',pdq=0,seasonal_pdqm=0,printLogs=False): 
         print("")
@@ -338,9 +357,54 @@ class SDS_TSforecast:
                     plt.grid()
                     plt.show()
                     plt.savefig(filePathGenerator()+"Predicted_time_series.png",transparent=False)
-                    
-        return self.__results
-    
+           
+            return self.__results
+        elif (self.method=='LSTM'):
+            
+            #Reshaping the data
+            train2 = train.iloc[:].values.reshape(-1,1)
+            if validate==True:
+                test2 = test.iloc[:].values.reshape(-1,1)
+            
+            # Scaling and transforming the data - scalar fit only on the train data
+            scaler = MinMaxScaler()
+            scaler.fit(train2)
+            scaled_train = scaler.transform(train2)
+            if validate==True:
+                scaled_test = scaler.transform(test2)
+                
+            # Setting parameters of the model - move this to another method:
+            n_input = 12 # Parameter to be set
+            n_features = 1 # Parameter to be set - always equal to one for a time series
+            batches = 1 # Parameter to be set
+            LSTM1_neurons = 100
+            activation_f1 = 'relu'
+            optimizer_type= 'adam'
+            Nepochs = 25
+            
+            # Time series generator object
+            train_generator = TimeseriesGenerator(scaled_train, scaled_train, length=n_input, batch_size=batches)
+            # X,y = generator[0]
+            # print(X[:5])
+            # print(y[:5])
+            
+            # define model
+            model = Sequential()
+            model.add(LSTM(LSTM1_neurons, activation=activation_f1, input_shape=(n_input, n_features)))
+            model.add(Dense(1))
+            model.compile(optimizer=optimizer_type, loss='mse')
+            model.summary()
+                           
+            # fit model
+            model.fit_generator(train_generator,epochs=Nepochs)   
+            
+            if (printSummary==True):
+                loss_per_epoch = model.history.history['loss']
+                plt.plot(range(len(loss_per_epoch)),loss_per_epoch)
+                plt.title('Fitting the LSTM based model over the scaled training dataset')
+                plt.xlabel('# Epoch')
+                plt.ylabel('Loss')
+                plt.grid()
     
     def forecast(self,steps=12,plotForecast=False):
         if (self.method=='SARIMA'):
@@ -370,7 +434,7 @@ class SDS_TSforecast:
 #####################################################
 #%%
 transectName = "Transect 3"
-Transects = read_timeSeries(transectName, plotTimeseries=False,resampling='MS')
+Transects = read_timeSeries(transectName, plotTimeseries=False,resampling='MS',readMethod='Old')
 
 #%% 
 # decomposition = seasonal_decompose(Transects,plotDecomposition=False)
@@ -392,8 +456,8 @@ Transects = read_timeSeries(transectName, plotTimeseries=False,resampling='MS')
 # display(Transects.columns)
 
 #%%
-Object = SDS_TSforecast(TS=Transects,method='SARIMA')
-
+# Object = SDS_tsa(TS=Transects,method='SARIMA')
+Object = SDS_tsa(TS=Transects,method='LSTM')
 p = d = q = range(0, 2)
 pdq = list(itertools.product(p, d, q))
 seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
@@ -406,12 +470,14 @@ seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
 
 #%%
 # temp1, temp2 = Object.setParameters(setting='GS',pdq=pdq,seasonal_pdqm=seasonal_pdq,printLogs=False)
-Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
+# Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
 
 
-results= Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
+# results= Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
+
+Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
 
 
-#%% Re-training the model over the complete data and forecasting
-Object.fitmodel()
-Forecast_results = Object.forecast(steps=12,plotForecast=True)
+# #%% Re-training the model over the complete data and forecasting
+# Object.fitmodel()
+# Forecast_results = Object.forecast(steps=12,plotForecast=True)
