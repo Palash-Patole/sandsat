@@ -16,7 +16,7 @@ To do:
         e. [To do] Auto arima for the SARIMA
         f. [To do] ARIMA fitting
         g. [To do] Auto arima, GS, manual setting for the ARIMA
-        h. [To do] Add values of RMSE and mean value of the series on predictions plot
+        h. [To do] Add values of RMSE and mean value of the series on predictions plot - SARIMA and LSTM
         i. [To do] Add description for all classes and methods
         j. [To do] RNN based forecast method- initial setup
         
@@ -296,7 +296,7 @@ class SDS_tsa:
                 
                 return(self.__pdq,self.__seasonal_pdqm)
                     
-    def fitmodel(self,splitPoint=0,validate=False,printSummary=False,plotPredictions=False):
+    def fitmodel(self,splitPoint=0,validate=False,printSummary=False,plotPredictions=False,saveModel=False,modelName='TSA_model'):
         print("")
         print("******************************************************************")
         print("                 TSA: Fitting the forecast model                  ")
@@ -357,8 +357,12 @@ class SDS_tsa:
                     plt.grid()
                     plt.show()
                     plt.savefig(filePathGenerator()+"Predicted_time_series.png",transparent=False)
-           
+                
+                # return predictions alongwith results, if validated
+                return self.__results, predictions
+                
             return self.__results
+        
         elif (self.method=='LSTM'):
             
             #Reshaping the data
@@ -384,28 +388,76 @@ class SDS_tsa:
             
             # Time series generator object
             train_generator = TimeseriesGenerator(scaled_train, scaled_train, length=n_input, batch_size=batches)
-            # X,y = generator[0]
-            # print(X[:5])
-            # print(y[:5])
             
             # define model
-            model = Sequential()
-            model.add(LSTM(LSTM1_neurons, activation=activation_f1, input_shape=(n_input, n_features)))
-            model.add(Dense(1))
-            model.compile(optimizer=optimizer_type, loss='mse')
-            model.summary()
+            self.__mod = Sequential()
+            self.__mod.add(LSTM(LSTM1_neurons, activation=activation_f1, input_shape=(n_input, n_features)))
+            self.__mod.add(Dense(1))
+            self.__mod.compile(optimizer=optimizer_type, loss='mse')
+            self.__mod.summary()
                            
             # fit model
-            model.fit_generator(train_generator,epochs=Nepochs)   
+            self.__mod.fit_generator(train_generator,epochs=Nepochs)   
             
             if (printSummary==True):
-                loss_per_epoch = model.history.history['loss']
+                loss_per_epoch = self.__mod.history.history['loss']
                 plt.plot(range(len(loss_per_epoch)),loss_per_epoch)
                 plt.title('Fitting the LSTM based model over the scaled training dataset')
                 plt.xlabel('# Epoch')
                 plt.ylabel('Loss')
                 plt.grid()
+                
+            # saving the model if required
+            if (saveModel==True):
+                self.__mod.save(filePathGenerator()+modelName+'.h5')
+            
+            # Validating the model predications over the test data
+            if (validate == True):
+                test_predictions = []
+                first_eval_batch = scaled_train[-n_input:]
+                current_batch = first_eval_batch.reshape((batches,n_input,n_features))
     
+                for i in range(len(scaled_test)):
+                    # predication one time stamp ahead 
+                    current_pred = self.__mod.predict(current_batch)[0]
+                    # store this prediction
+                    test_predictions.append(current_pred)
+                    # update the current batch to include this recent prediction and drop an old one 
+                    current_batch = np.append(current_batch[:,1:,:],[[current_pred]],axis=1)
+                    
+                # Inversing the scaling
+                true_predictions = scaler.inverse_transform(test_predictions)
+                
+                # Creating a data frame holding predications and test data values
+                Data = np.zeros((len(true_predictions),2))
+                for index in range(len(true_predictions)):
+                    Data[index,0] = test.iloc[index]
+                    Data[index,1] = true_predictions[index]
+                pred_df = pd.DataFrame(Data,test.index,['Original values','Predicted values'])
+                
+                # Computing error in the predicted values
+                MSE = mean_squared_error(pred_df['Original values'], pred_df['Predicted values'])
+                RMSE = rmse(pred_df['Original values'], pred_df['Predicted values'])
+                print("Mean squared error of the predictions is :", MSE)
+                print("Root mean squared error of the predictions is :", RMSE)
+                
+                if (plotPredictions==True):
+                    fig, ax = plt.subplots()
+                    pred_df.plot(ax=ax,figsize=(14, 7))
+                    ax.set_ylabel('Shoreline location [m]') 
+                    ax.set_xlabel('')
+                    title = "Validating predictions with "+ self.method + " model"
+                    ax.set_title(title)
+                    plt.legend()
+                    plt.grid()
+                    plt.show()
+                    plt.savefig(filePathGenerator()+"Predicted_time_series.png",transparent=False)
+                
+                # return predictions alongwith the model if validated:
+                return self.__mod, pred_df
+            
+            return self.__mod
+                    
     def forecast(self,steps=12,plotForecast=False):
         if (self.method=='SARIMA'):
             # Forecasting for a given number of steps
@@ -475,9 +527,10 @@ seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
 
 # results= Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
 
-Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
+Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True,saveModel=True)
 
 
 # #%% Re-training the model over the complete data and forecasting
 # Object.fitmodel()
 # Forecast_results = Object.forecast(steps=12,plotForecast=True)
+
