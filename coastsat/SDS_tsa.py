@@ -19,6 +19,7 @@ To do:
         h. [To do] Add values of RMSE and mean value of the series on predictions plot - SARIMA and LSTM
         i. [To do] Add description for all classes and methods
         j. [To do] RNN based forecast method- initial setup
+        k. [To do] RNN based forecast - when a model is imported, find the batch size
         
 """
 
@@ -52,6 +53,7 @@ from keras.preprocessing.sequence import TimeseriesGenerator
 from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import LSTM
+from keras.models import load_model
 
 
 #####################################################
@@ -295,7 +297,28 @@ class SDS_tsa:
                 print("(P,D,Q,m)=",self.__seasonal_pdqm)
                 
                 return(self.__pdq,self.__seasonal_pdqm)
-                    
+    
+    def loadModel(self,modelName = 'TSA_model'):
+        print("")
+        print("******************************************************************")
+        print("                 TSA: Loading a forecast model                    ")
+        print("******************************************************************")
+        print("")
+        
+        # Full path to the model
+        full_Path = filePathGenerator()+modelName+'.h5'
+        
+        # Error handling
+        assert(os.path.exists(full_Path)),"No model exists with the specified name."
+        
+        # load the model
+        if self.method=='LSTM':
+            self.__mod = load_model(full_Path)
+            print(modelName+ " model successfully loaded.")
+            self.__mod.summary()
+        else:
+            print("Model can only be loaded for the LSTM method.")
+            
     def fitmodel(self,splitPoint=0,validate=False,printSummary=False,plotPredictions=False,saveModel=False,modelName='TSA_model'):
         print("")
         print("******************************************************************")
@@ -410,6 +433,7 @@ class SDS_tsa:
             # saving the model if required
             if (saveModel==True):
                 self.__mod.save(filePathGenerator()+modelName+'.h5')
+                print("The fitted model has been saved at :",filePathGenerator())
             
             # Validating the model predications over the test data
             if (validate == True):
@@ -459,9 +483,15 @@ class SDS_tsa:
             return self.__mod
                     
     def forecast(self,steps=12,plotForecast=False):
+        print("")
+        print("******************************************************************")
+        print("                 TSA: Forecasting with the chosen model           ")
+        print("******************************************************************")
+        print("")
         if (self.method=='SARIMA'):
             # Forecasting for a given number of steps
             pred_uc = self.__results.get_forecast(steps)
+            print("Forecasted for ",steps," time steps in the future.")
             
             if plotForecast==True:
                 plt.figure()
@@ -479,6 +509,62 @@ class SDS_tsa:
                 plt.show()
              
             return pred_uc
+        
+        elif (self.method=='LSTM'):
+                
+                config = self.__mod.get_config()
+                layers = config['layers'][1]['config']['batch_input_shape']
+                self.__n_input = layers[1]
+                self.__batches = 1 # set as constant, to be extracted from the config
+                self.__n_features = 1
+                
+                # print("Number of inputs and batches for the loaded model are: ",self.__n_input ," and ", self.__batches)
+                
+                # Creating train data and scaling it
+                train = self.TS.iloc[:]
+                train2 = train.iloc[:].values.reshape(-1,1) #Reshaping the data
+                scaler = MinMaxScaler()
+                scaler.fit(train2)
+                scaled_train = scaler.transform(train2)
+                
+                # Forecasting
+                forecasts = []
+                first_eval_batch = scaled_train[-self.__n_input:]
+                current_batch = first_eval_batch.reshape((self.__batches,self.__n_input,self.__n_features))
+    
+                for i in range(steps):
+                    # predication one time stamp ahead 
+                    current_foreC = self.__mod.predict(current_batch)[0]
+                    # store this prediction
+                    forecasts.append(current_foreC)
+                    # update the current batch to include this recent prediction and drop an old one 
+                    current_batch = np.append(current_batch[:,1:,:],[[current_foreC]],axis=1)
+                    
+                # Inversing the scaling
+                true_forecasts = scaler.inverse_transform(forecasts)
+                print("Forecasted for ",steps," time steps in the future.")
+            
+                # Creating a time series of the forecasted values
+                last_timeStamp = self.TS.index[-1]
+                freqTS = self.TS.index.freq
+                indexForecast = pd.date_range(last_timeStamp, periods=steps+1, freq = freqTS) # Extract this frequency from self.TS
+                indexForecast = indexForecast[1:]
+                forecast_TS = pd.DataFrame(true_forecasts,indexForecast,['Forecasted values'])
+                
+                # Plotting the forecasted values
+                if plotForecast==True:
+                    plt.figure()
+                    ax= self.TS.plot(label='Observed values', figsize=(14, 7), color = 'k', lw = 1)
+                    forecast_TS.plot(ax=ax, label='Forecasted values', color = 'r', lw = 1)
+                    ax.set_xlabel('')
+                    ax.set_ylabel('Shoreline location [m]')
+                    plt.legend(loc = 'upper left')
+                    plt.grid()
+                    plt.savefig(filePathGenerator()+'Forecasted_time_series.png', transparent = False)
+                    plt.show()
+                    
+                return forecast_TS
+            
             
 
 #####################################################
@@ -508,29 +594,41 @@ Transects = read_timeSeries(transectName, plotTimeseries=False,resampling='MS',r
 # display(Transects.columns)
 
 #%%
+
+# For the SARIMA models:
+    
 # Object = SDS_tsa(TS=Transects,method='SARIMA')
+
+# p = d = q = range(0, 2)
+# pdq = list(itertools.product(p, d, q))
+# seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
+
+# For the LSTM based model
 Object = SDS_tsa(TS=Transects,method='LSTM')
-p = d = q = range(0, 2)
-pdq = list(itertools.product(p, d, q))
-seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
 
-# print('Examples of parameter combinations for Seasonal ARIMA...')
-# print('SARIMAX: {} x {}'.format(pdq[1], seasonal_pdq[1]))
-# print('SARIMAX: {} x {}'.format(pdq[1], seasonal_pdq[2]))
-# print('SARIMAX: {} x {}'.format(pdq[2], seasonal_pdq[3]))
-# print('SARIMAX: {} x {}'.format(pdq[2], seasonal_pdq[4]))
-
-#%%
+#%% Setting the parameters of the model
 # temp1, temp2 = Object.setParameters(setting='GS',pdq=pdq,seasonal_pdqm=seasonal_pdq,printLogs=False)
 # Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
 
 
+#%% Fitting the model over train data set and validating against test data test
+
 # results= Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
 
-Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True,saveModel=True)
+# Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
 
 
-# #%% Re-training the model over the complete data and forecasting
+#%% Re-training the model over the complete data and forecasting
+
+#For SARIMA based models 
 # Object.fitmodel()
+
 # Forecast_results = Object.forecast(steps=12,plotForecast=True)
+
+# For LSTM based models
+#Object.fitmodel(saveModel=True,modelName='TSA_model2') 
+#%% Reading for a saved model and then forecasting
+Object.loadModel(modelName='TSA_model2')
+fTS= Object.forecast(plotForecast=True)
+
 
