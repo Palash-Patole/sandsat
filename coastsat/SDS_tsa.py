@@ -7,9 +7,9 @@ predicting the results into future.
 To do:
     1. Based on Amin's work in a seperate jupyter notebook:
         a. [Done] Read the time series data from a .csv seperate file
+           [Done] Provide an option to select a transect to analyze.
            [To do] Error handling for the transect name
         b. Replace the above functionality by taking time series data as an input. 
-           Provide an option to select a transect to analyze.
         c. [Done] After a/b, format the data.Linear intepolation, monthly resampling.
            [Done] Provide the option to plot(?)
         d. [Done] Provide the option to perform seasonal decomposition of the selected transect data
@@ -18,12 +18,13 @@ To do:
         g. [To do] Auto arima, GS, manual setting for the ARIMA
         h. [To do] Add values of RMSE and mean value of the series on predictions plot - SARIMA and LSTM
         i. [To do] Add description for all classes and methods
-        j. [To do] RNN based forecast method- initial setup
+        j. [Done] RNN based forecast method- initial setup
         k. [To do] RNN based forecast - when a model is imported, find the batch size
+        l. [Done] Setting parameters of the LSTM model through setParameters method
         
 """
 
-# Following package installation instruction is required, if it is absent from environment
+# Following package installation instruction is required, if it is absent from the environment
 # pip install statsmodels
 
 #####################################################
@@ -239,7 +240,7 @@ class SDS_tsa:
         assert((self.method=='SARIMA') or (self.method=='LSTM')),"The specified forecast method is not supported."
         
         
-    def setParameters(self,setting='auto_arima',pdq=0,seasonal_pdqm=0,printLogs=False): 
+    def setParameters(self,Parasettings,setting='auto_arima',pdq=0,seasonal_pdqm=0,printLogs=False): 
         print("")
         print("******************************************************************")
         print("        TSA: Setting parameters for the forecast model            ")
@@ -286,7 +287,9 @@ class SDS_tsa:
                 self.__pdq = AIC[0][0]
                 self.__seasonal_pdqm = AIC[0][1]
                 
-                return(self.__pdq,self.__seasonal_pdqm)
+            elif (self.method=='LSTM'):
+                print("Grid serch technique of setting the parameters is not defined for the LSTM method.")
+                
         elif (setting=='manual'):
             if (self.method=='SARIMA'):
                 self.__pdq = pdq
@@ -296,8 +299,44 @@ class SDS_tsa:
                 print("(p,d,q)=",self.__pdq)
                 print("(P,D,Q,m)=",self.__seasonal_pdqm)
                 
-                return(self.__pdq,self.__seasonal_pdqm)
+            elif (self.method=='LSTM'):
+                # Error handling 
+                assert(type(Parasettings)==dict), "Settings should be passed as a variable of the dictionary type."
     
+                # Extracting the settings, otherwise assigning the default values for some of the parameters
+                self.__n_input = Parasettings["n_input"]
+                self.__LSTM1_neurons = Parasettings["LSTM1_neurons"]
+                self.__Nepochs = Parasettings["Nepochs"]
+                
+                try:    
+                    self.__n_features = Parasettings["n_features"]    
+                except:
+                    self.__n_features = 1 #  always equal to one for a time series
+                
+                try:
+                    self.__batches = Parasettings[ "batches"]
+                except:
+                    self.__batches = 1
+                    
+                try:
+                    self.__activation_f1 = Parasettings["activation_f1"]
+                except:
+                    self.__activation_f1 = 'relu'
+                    
+                try:
+                    self.__optimizer_type = Parasettings["optimizer_type"]
+                except:
+                    self.__optimizer_type = 'adam'
+                    
+                print("Input parameters for the ",self.method ,"model are:")                
+                print("n_input=",self.__n_input)
+                print("n_features=",self.__n_features)
+                print("batches=",self.__batches)
+                print("activation_f1=",self.__activation_f1)
+                print("optimizer_type=",self.__optimizer_type)
+                print("LSTM1_neurons=",self.__LSTM1_neurons)
+                print("Nepochs=",self.__Nepochs)
+                
     def loadModel(self,modelName = 'TSA_model'):
         print("")
         print("******************************************************************")
@@ -362,7 +401,7 @@ class SDS_tsa:
                 RMSE = rmse(test, predictions.predicted_mean)
                 print("Mean squared error of the predictions is :", MSE)
                 print("Root mean squared error of the predictions is :", RMSE)
-                
+                print("Mean value of the test data set is : ",test.mean())
                 
                 if (plotPredictions==True):
                     ax = plt.figure()
@@ -399,28 +438,19 @@ class SDS_tsa:
             scaled_train = scaler.transform(train2)
             if validate==True:
                 scaled_test = scaler.transform(test2)
-                
-            # Setting parameters of the model - move this to another method:
-            n_input = 12 # Parameter to be set
-            n_features = 1 # Parameter to be set - always equal to one for a time series
-            batches = 1 # Parameter to be set
-            LSTM1_neurons = 100
-            activation_f1 = 'relu'
-            optimizer_type= 'adam'
-            Nepochs = 25
-            
+                            
             # Time series generator object
-            train_generator = TimeseriesGenerator(scaled_train, scaled_train, length=n_input, batch_size=batches)
+            train_generator = TimeseriesGenerator(scaled_train, scaled_train, length=self.__n_input, batch_size=self.__batches)
             
             # define model
             self.__mod = Sequential()
-            self.__mod.add(LSTM(LSTM1_neurons, activation=activation_f1, input_shape=(n_input, n_features)))
+            self.__mod.add(LSTM(self.__LSTM1_neurons, activation=self.__activation_f1, input_shape=(self.__n_input, self.__n_features)))
             self.__mod.add(Dense(1))
-            self.__mod.compile(optimizer=optimizer_type, loss='mse')
+            self.__mod.compile(optimizer=self.__optimizer_type, loss='mse')
             self.__mod.summary()
                            
             # fit model
-            self.__mod.fit_generator(train_generator,epochs=Nepochs)   
+            self.__mod.fit_generator(train_generator,epochs=self.__Nepochs)   
             
             if (printSummary==True):
                 loss_per_epoch = self.__mod.history.history['loss']
@@ -438,8 +468,8 @@ class SDS_tsa:
             # Validating the model predications over the test data
             if (validate == True):
                 test_predictions = []
-                first_eval_batch = scaled_train[-n_input:]
-                current_batch = first_eval_batch.reshape((batches,n_input,n_features))
+                first_eval_batch = scaled_train[-self.__n_input:]
+                current_batch = first_eval_batch.reshape((self.__batches,self.__n_input,self.__n_features))
     
                 for i in range(len(scaled_test)):
                     # predication one time stamp ahead 
@@ -464,6 +494,7 @@ class SDS_tsa:
                 RMSE = rmse(pred_df['Original values'], pred_df['Predicted values'])
                 print("Mean squared error of the predictions is :", MSE)
                 print("Root mean squared error of the predictions is :", RMSE)
+                print("Mean value of the test data set is : ",pred_df['Original values'].mean())
                 
                 if (plotPredictions==True):
                     fig, ax = plt.subplots()
@@ -511,14 +542,13 @@ class SDS_tsa:
             return pred_uc
         
         elif (self.method=='LSTM'):
-                
-                config = self.__mod.get_config()
-                layers = config['layers'][1]['config']['batch_input_shape']
-                self.__n_input = layers[1]
-                self.__batches = 1 # set as constant, to be extracted from the config
-                self.__n_features = 1
-                
-                # print("Number of inputs and batches for the loaded model are: ",self.__n_input ," and ", self.__batches)
+                if not hasattr(self, '__n_input'): # In case a saved model is used for the forecast
+                    config = self.__mod.get_config()
+                    layers = config['layers'][1]['config']['batch_input_shape']
+                    self.__n_input = layers[1]
+                    self.__batches = 1 # set as constant, to be extracted from the config
+                    self.__n_features = 1
+                    pass # Extract remaining parameters from the config
                 
                 # Creating train data and scaling it
                 train = self.TS.iloc[:]
@@ -593,42 +623,75 @@ Transects = read_timeSeries(transectName, plotTimeseries=False,resampling='MS',r
 
 # display(Transects.columns)
 
-#%%
+#%% Multiple ways of forecasting
+case = 3 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
+         # 2 - SARIMA based, manual setting for parameters->fit->validate->fit over all data->forecast
+         # 3 - LSTM based, manual setting for parameters->fit-validate->fit over all data->forecast
+         # 4 - LSTM based, load fitted model -> forecast
+         
 
-# For the SARIMA models:
+if case==1:
+# SARIMA based grid search for the parameters setting      
+    # Creating an instance of the TSA class   
+    Object = SDS_tsa(TS=Transects,method='SARIMA')
+
+    # Setting parameters for the created instance
+    p = d = q = range(0, 2)
+    pdq = list(itertools.product(p, d, q))
+    seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
+    Object.setParameters(setting='GS',pdq=pdq,seasonal_pdqm=seasonal_pdq,printLogs=False)
+
+    # Fit the model over the training data and validate against the test data
+    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
     
-# Object = SDS_tsa(TS=Transects,method='SARIMA')
+    # Re-training the model over the complete data and forecasting
+    Object.fitmodel()
+    Forecast_results = Object.forecast(steps=12,plotForecast=True)
+    
+elif case==2:
+# SARIMA based, manual setting for the parameters    
+    # Creating an instance of the TSA class   
+    Object = SDS_tsa(TS=Transects,method='SARIMA')
+    
+    # Setting parameters for the created instance
+    Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
+    
+    # Fit the model over the training data and validate against the test data
+    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
+    
+    # Re-training the model over the complete data and forecasting
+    Object.fitmodel()
+    Forecast_results = Object.forecast(steps=12,plotForecast=True)
+    
+elif case == 3:
+# For the LSTM based model, manual setting for parameters to fit the model
+    # Creating an instance of the TSA class     
+    Object = SDS_tsa(TS=Transects,method='LSTM')
+    
+    # Setting the parameters for the model
+    Paraset = {
+    "n_input":12,
+    "LSTM1_neurons": 100,
+    "Nepochs":25
+    }
+    
+    Object.setParameters(setting='manual',Parasettings = Paraset)
 
-# p = d = q = range(0, 2)
-# pdq = list(itertools.product(p, d, q))
-# seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
+    # Fit the model over the training data and validate against the test data
+    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
 
-# For the LSTM based model
-Object = SDS_tsa(TS=Transects,method='LSTM')
+    # # Re-training the model over the complete data and forecasting
+    # Object.fitmodel(saveModel=True,modelName='TSA_model2') 
+    # Forecast_results = Object.forecast(steps=12,plotForecast=True)
 
-#%% Setting the parameters of the model
-# temp1, temp2 = Object.setParameters(setting='GS',pdq=pdq,seasonal_pdqm=seasonal_pdq,printLogs=False)
-# Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
+elif case==4:
+# Loading a LSTM based model and forecasting using such a model
+    # Creating an instance of the TSA class     
+    Object = SDS_tsa(TS=Transects,method='LSTM')
 
+    # Loading a saved model and then forecasting
+    Object.loadModel(modelName='TSA_model2')
+    fTS= Object.forecast(steps=12,plotForecast=True)
 
-#%% Fitting the model over train data set and validating against test data test
-
-# results= Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
-
-# Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
-
-
-#%% Re-training the model over the complete data and forecasting
-
-#For SARIMA based models 
-# Object.fitmodel()
-
-# Forecast_results = Object.forecast(steps=12,plotForecast=True)
-
-# For LSTM based models
-#Object.fitmodel(saveModel=True,modelName='TSA_model2') 
-#%% Reading for a saved model and then forecasting
-Object.loadModel(modelName='TSA_model2')
-fTS= Object.forecast(plotForecast=True)
 
 
