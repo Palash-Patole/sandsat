@@ -1,5 +1,5 @@
 # Contributor: Palash Patole
-# Updated on:  04 August 2020
+# Updated on:  11 August 2020
 #-------------------------------------------------------------------------------
 """ This module performs the time-series analysis of a trasect's data and allows 
 predicting the results into future.
@@ -72,7 +72,8 @@ plt.rcParams['axes.facecolor'] = 'w'
 #####################################################
 def filePathGenerator():
     # Creating a directory to store the results
-    path_to_results = os.path.join(os.getcwd(), '../data/TSA_results/')
+    # path_to_results = os.path.join(os.getcwd(), '../data/TSA_results/') #check the directory structure
+    path_to_results = os.path.join(os.getcwd(), 'data/TSA_results/')
     if os.path.exists(path_to_results) == False:
         os.mkdir(path_to_results) 
 
@@ -96,11 +97,13 @@ def read_timeSeries(transectName,plotTimeseries=False,resampling='none',readMeth
     
     """
     if (readMethod=='new'): 
-        file_name = '../data/transect_time_series.csv'
+        # file_name = '../data/transect_time_series.csv' #check the directory structure
+        file_name = os.path.join(os.getcwd(),'data/transect_time_series.csv')
         Transects = pd.read_csv(file_name,index_col='dates',parse_dates=True)
         Transects.drop('Unnamed: 0', axis =1, inplace = True)
     elif (readMethod=='Old'): # Added 7th August to keep the old method of reading time-series used in Amin's notebook
-        file_name = '../data/transect_time_series.csv'
+        # file_name = '../data/transect_time_series.csv' #check the directory structure
+        file_name = os.path.join(os.getcwd(),'data/transect_time_series.csv')
         Transects = pd.read_csv(file_name)
         Transects['Date_Time'] = pd.to_datetime(Transects['dates'])
         Transects.set_index('Date_Time',inplace=True)
@@ -205,12 +208,7 @@ def seasonal_decompose(timeSeries,model='add',plotDecomposition=False):
     print("                TSA: Seasonal decomposition                       ")
     print("******************************************************************")
     print("")
-    
-    # Creating a directory to store the results
-    path_to_results = os.path.join(os.getcwd(), '../data/TSA_results/')
-    if os.path.exists(path_to_results) == False:
-        os.mkdir(path_to_results) 
-    
+        
     # Decomposing the input time series
     decomposed = sm.tsa.seasonal_decompose(timeSeries,model=model)
     print("Seasonal decomposition of the input time series is successful.")
@@ -219,7 +217,7 @@ def seasonal_decompose(timeSeries,model='add',plotDecomposition=False):
     if plotDecomposition==True:
         matplotlib.rcParams['figure.figsize'] = 18, 8
         ax = decomposed.plot()
-        plt.savefig(path_to_results+'Seasonal_decomposition_'+model+'.png', transparent=False)
+        plt.savefig(filePathGenerator()+'Seasonal_decomposition_'+model+'.png', transparent=False)
         
         
     return decomposed
@@ -240,7 +238,7 @@ class SDS_tsa:
         assert((self.method=='SARIMA') or (self.method=='LSTM')),"The specified forecast method is not supported."
         
         
-    def setParameters(self,Parasettings,setting='auto_arima',pdq=0,seasonal_pdqm=0,printLogs=False): 
+    def setParameters(self,Parasettings=[],setting='auto_arima',pdq=0,seasonal_pdqm=0,printLogs=False): 
         print("")
         print("******************************************************************")
         print("        TSA: Setting parameters for the forecast model            ")
@@ -596,102 +594,4 @@ class SDS_tsa:
                 return forecast_TS
             
             
-
-#####################################################
-############# LOCAL TESTING: REMOVE LATER ###########
-#####################################################
-#%%
-transectName = "Transect 3"
-Transects = read_timeSeries(transectName, plotTimeseries=False,resampling='MS',readMethod='Old')
-
-#%% 
-# decomposition = seasonal_decompose(Transects,plotDecomposition=False)
-
-# y2_trend = decomposition.trend
-# y2_seasonal = decomposition.seasonal
-
-# plt.figure(figsize=(16,5), dpi = 220)
-# plt.plot(y2_trend, '--*r', lw = 0.5, ms = 4, label = 'Trend line')
-# plt.plot(y2_seasonal, '--b', lw = 0.5, ms = 4, label = 'Seasonality line')
-# plt.plot(Transects, 'k', ms = 2, lw = 0.5, label = 'Interpolated resampled data')
-# plt.xlabel('Year')
-# plt.ylabel('Shoreline location [m]')
-# plt.legend()
-# path_to_results = os.path.join(os.getcwd(), '../data/TSA_results/')
-# plt.savefig(path_to_results+'Trend_seasonality.png', transparent = False)
-# plt.show()
-
-# display(Transects.columns)
-
-#%% Multiple ways of forecasting
-case = 3 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
-         # 2 - SARIMA based, manual setting for parameters->fit->validate->fit over all data->forecast
-         # 3 - LSTM based, manual setting for parameters->fit-validate->fit over all data->forecast
-         # 4 - LSTM based, load fitted model -> forecast
-         
-
-if case==1:
-# SARIMA based grid search for the parameters setting      
-    # Creating an instance of the TSA class   
-    Object = SDS_tsa(TS=Transects,method='SARIMA')
-
-    # Setting parameters for the created instance
-    p = d = q = range(0, 2)
-    pdq = list(itertools.product(p, d, q))
-    seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
-    Object.setParameters(setting='GS',pdq=pdq,seasonal_pdqm=seasonal_pdq,printLogs=False)
-
-    # Fit the model over the training data and validate against the test data
-    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
-    
-    # Re-training the model over the complete data and forecasting
-    Object.fitmodel()
-    Forecast_results = Object.forecast(steps=12,plotForecast=True)
-    
-elif case==2:
-# SARIMA based, manual setting for the parameters    
-    # Creating an instance of the TSA class   
-    Object = SDS_tsa(TS=Transects,method='SARIMA')
-    
-    # Setting parameters for the created instance
-    Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
-    
-    # Fit the model over the training data and validate against the test data
-    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
-    
-    # Re-training the model over the complete data and forecasting
-    Object.fitmodel()
-    Forecast_results = Object.forecast(steps=12,plotForecast=True)
-    
-elif case == 3:
-# For the LSTM based model, manual setting for parameters to fit the model
-    # Creating an instance of the TSA class     
-    Object = SDS_tsa(TS=Transects,method='LSTM')
-    
-    # Setting the parameters for the model
-    Paraset = {
-    "n_input":12,
-    "LSTM1_neurons": 100,
-    "Nepochs":25
-    }
-    
-    Object.setParameters(setting='manual',Parasettings = Paraset)
-
-    # Fit the model over the training data and validate against the test data
-    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
-
-    # # Re-training the model over the complete data and forecasting
-    # Object.fitmodel(saveModel=True,modelName='TSA_model2') 
-    # Forecast_results = Object.forecast(steps=12,plotForecast=True)
-
-elif case==4:
-# Loading a LSTM based model and forecasting using such a model
-    # Creating an instance of the TSA class     
-    Object = SDS_tsa(TS=Transects,method='LSTM')
-
-    # Loading a saved model and then forecasting
-    Object.loadModel(modelName='TSA_model2')
-    fTS= Object.forecast(steps=12,plotForecast=True)
-
-
 
