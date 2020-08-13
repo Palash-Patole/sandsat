@@ -15,14 +15,14 @@ import itertools
 # Following is specific to spyder IDE
 from IPython.display import display
 
-#####################################################
-############# LOCAL TESTING: REMOVE LATER ###########
-#####################################################
-#%%
+
+#%% Reading the time-series
 transectName = "Transect 3"
 Transects = SDS_tsa.read_timeSeries(transectName, plotTimeseries=False,resampling='MS',readMethod='Old')
 
-# #%% 
+Transects.dropna(inplace=True)
+
+# #%% Seasonal decompose 
 # decomposition = SDS_tsa.seasonal_decompose(Transects,plotDecomposition=False)
 
 # y2_trend = decomposition.trend
@@ -40,7 +40,7 @@ Transects = SDS_tsa.read_timeSeries(transectName, plotTimeseries=False,resamplin
 # plt.show()
 
 #%% Multiple ways of forecasting
-case = 4 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
+case = 2 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
          # 2 - SARIMA based, manual setting for parameters->fit->validate->fit over all data->forecast
          # 3 - LSTM based, manual setting for parameters->fit-validate->fit over all data->forecast
          # 4 - LSTM based, load fitted model -> forecast
@@ -53,9 +53,11 @@ if case==1:
 
     # Setting parameters for the created instance
     p = d = q = range(0, 2)
-    pdq = list(itertools.product(p, d, q))
-    seasonal_pdq = [(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
-    Object.setParameters(setting='GS',pdq=pdq,seasonal_pdqm=seasonal_pdq,printLogs=False)
+    paraSet = {
+    "pdq": list(itertools.product(p, d, q)),
+    "seasonal_pdqm":[(x[0], x[1], x[2], 2) for x in list(itertools.product(p, d, q))]
+    }    
+    Object.setParameters(setting='GS',Parasettings=paraSet,printLogs=False)
 
     # Fit the model over the training data and validate against the test data
     Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
@@ -70,7 +72,11 @@ elif case==2:
     Object = SDS_tsa.SDS_tsa(TS=Transects,method='SARIMA')
     
     # Setting parameters for the created instance
-    Object.setParameters(setting='manual',pdq=(1,1,1),seasonal_pdqm=(1,1,1,70))
+    paraSet = {
+    "pdq": (1,1,1),
+    "seasonal_pdqm":(1,1,1,70)
+    }  
+    Object.setParameters(setting='manual',Parasettings=paraSet)
     
     # Fit the model over the training data and validate against the test data
     Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
@@ -86,19 +92,19 @@ elif case == 3:
     
     # Setting the parameters for the model
     Paraset = {
-    "n_input":12,
-    "LSTM1_neurons": 100,
-    "Nepochs":25
+    "n_input":70,
+    "LSTM1_neurons": 150,
+    "Nepochs":50
     }
     
     Object.setParameters(setting='manual',Parasettings = Paraset)
 
     # Fit the model over the training data and validate against the test data
-    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
+    Object.fitmodel(splitPoint=303,validate=True,printSummary=True,plotPredictions=False)
 
-    # Re-training the model over the complete data and forecasting
-    Object.fitmodel(saveModel=True,modelName='TSA_model2') 
-    Forecast_results = Object.forecast(steps=12,plotForecast=True)
+    # # Re-training the model over the complete data and forecasting
+    # Object.fitmodel(saveModel=True,modelName='TSA_model5') 
+    # Forecast_results = Object.forecast(steps=12,plotForecast=True)
 
 elif case==4:
 # Loading a LSTM based model and forecasting using such a model

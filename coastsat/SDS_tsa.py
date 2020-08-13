@@ -21,7 +21,8 @@ To do:
         j. [Done] RNN based forecast method- initial setup
         k. [To do] RNN based forecast - when a model is imported, find the batch size
         l. [Done] Setting parameters of the LSTM model through setParameters method
-        
+        m. [Done] Extract the parameters to be set in case of SARIMA from a dictionary variable similar to the LSTM
+        n. [To do] Define a method to compute casuality between two time-serieses
 """
 
 # Following package installation instruction is required, if it is absent from the environment
@@ -218,8 +219,6 @@ def seasonal_decompose(timeSeries,model='add',plotDecomposition=False):
         matplotlib.rcParams['figure.figsize'] = 18, 8
         ax = decomposed.plot()
         plt.savefig(filePathGenerator()+'Seasonal_decomposition_'+model+'.png', transparent=False)
-        
-        
     return decomposed
 
 
@@ -238,7 +237,7 @@ class SDS_tsa:
         assert((self.method=='SARIMA') or (self.method=='LSTM')),"The specified forecast method is not supported."
         
         
-    def setParameters(self,Parasettings=[],setting='auto_arima',pdq=0,seasonal_pdqm=0,printLogs=False): 
+    def setParameters(self,Parasettings=[],setting='auto_arima',printLogs=False): 
         print("")
         print("******************************************************************")
         print("        TSA: Setting parameters for the forecast model            ")
@@ -259,6 +258,8 @@ class SDS_tsa:
             pass
             
             if (self.method=='SARIMA'):
+                pdq = Parasettings["pdq"]
+                seasonal_pdqm = Parasettings["seasonal_pdqm"]
                 AIC = []
                 for param in pdq:
                     for param_seasonal in seasonal_pdqm:
@@ -290,8 +291,8 @@ class SDS_tsa:
                 
         elif (setting=='manual'):
             if (self.method=='SARIMA'):
-                self.__pdq = pdq
-                self.__seasonal_pdqm = seasonal_pdqm
+                self.__pdq = Parasettings["pdq"]
+                self.__seasonal_pdqm = Parasettings["seasonal_pdqm"]
                 
                 print("\nInput parameters for",self.method ,"model are:")
                 print("(p,d,q)=",self.__pdq)
