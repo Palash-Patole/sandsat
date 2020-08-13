@@ -16,7 +16,7 @@ To do:
         e. [To do] Auto arima for the SARIMA
         f. [To do] ARIMA fitting
         g. [To do] Auto arima, GS, manual setting for the ARIMA
-        h. [To do] Add values of RMSE and mean value of the series on predictions plot - SARIMA and LSTM
+        h. [Done] Add values of RMSE and mean value of the series on predictions plot - SARIMA and LSTM
         i. [To do] Add description for all classes and methods
         j. [Done] RNN based forecast method- initial setup
         k. [To do] RNN based forecast - when a model is imported, find the batch size
@@ -402,6 +402,7 @@ class SDS_tsa:
                 print("Root mean squared error of the predictions is :", RMSE)
                 print("Mean value of the test data set is : ",test.mean())
                 
+                addText = True # can be taken as an additional input to the method
                 if (plotPredictions==True):
                     ax = plt.figure()
                     pred_ci = predictions.conf_int()
@@ -412,8 +413,12 @@ class SDS_tsa:
                                     pred_ci.iloc[:, 1], color='k', alpha=.2,label = 'Uncertainity')
                     ax.set_ylabel('Shoreline location [m]') 
                     ax.set_xlabel('')
-                    title = "Validating predictions with "+ self.method + " model"
+                    title = "Validating predictions with "+ self.method + " model: " + str(self.__pdq) + "x" + str(self.__seasonal_pdqm)
                     ax.set_title(title)
+                    if addText==True:
+                        info = "Mean value of the test data: " + str(round(test.mean(),2)) 
+                        info = info+ "\nMSE: "+ str(round(MSE,2)) + "\nRMSE: " + str(round(RMSE,2))
+                        plt.text(0.05,0.9,info,transform=ax.transAxes,bbox=dict(facecolor='green', alpha=0.2))
                     plt.legend()
                     plt.grid()
                     plt.show()
@@ -495,6 +500,7 @@ class SDS_tsa:
                 print("Root mean squared error of the predictions is :", RMSE)
                 print("Mean value of the test data set is : ",pred_df['Original values'].mean())
                 
+                addText = True # can be taken as an additional input to the method
                 if (plotPredictions==True):
                     fig, ax = plt.subplots()
                     pred_df.plot(ax=ax,figsize=(14, 7))
@@ -502,6 +508,16 @@ class SDS_tsa:
                     ax.set_xlabel('')
                     title = "Validating predictions with "+ self.method + " model"
                     ax.set_title(title)
+                    if addText==True:
+                        info = "Mean value of the test data: " + str(round(pred_df['Original values'].mean(),2)) 
+                        info = info+ "\nMSE: "+ str(round(MSE,2)) + "\nRMSE: " + str(round(RMSE,2))
+                        plt.text(0.3,0.9,info,transform=ax.transAxes,bbox=dict(facecolor='green', alpha=0.2))
+
+                        info2 = "LSTM model with 1 LSTM + 1 dense layer: \n"
+                        info2 = info2 + "Number of inputs: " + str(self.__n_input)
+                        info2 = info2 + "\nNumber of neurons: " + str(self.__LSTM1_neurons)
+                        info2 = info2 + "\nNumber of epochs: " + str(self.__Nepochs)
+                        plt.text(0.05,0.9,info2,transform=ax.transAxes,bbox=dict(facecolor='blue', alpha=0.2))
                     plt.legend()
                     plt.grid()
                     plt.show()

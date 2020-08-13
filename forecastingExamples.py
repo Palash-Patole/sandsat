@@ -20,7 +20,8 @@ from IPython.display import display
 transectName = "Transect 3"
 Transects = SDS_tsa.read_timeSeries(transectName, plotTimeseries=False,resampling='MS',readMethod='Old')
 
-Transects.dropna(inplace=True)
+if transectName=="Transect 1":
+    Transects.dropna(inplace=True)
 
 # #%% Seasonal decompose 
 # decomposition = SDS_tsa.seasonal_decompose(Transects,plotDecomposition=False)
@@ -40,7 +41,7 @@ Transects.dropna(inplace=True)
 # plt.show()
 
 #%% Multiple ways of forecasting
-case = 2 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
+case = 3 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
          # 2 - SARIMA based, manual setting for parameters->fit->validate->fit over all data->forecast
          # 3 - LSTM based, manual setting for parameters->fit-validate->fit over all data->forecast
          # 4 - LSTM based, load fitted model -> forecast
@@ -60,7 +61,7 @@ if case==1:
     Object.setParameters(setting='GS',Parasettings=paraSet,printLogs=False)
 
     # Fit the model over the training data and validate against the test data
-    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
+    Object.fitmodel(splitPoint=303,validate=True,printSummary=True,plotPredictions=True)
     
     # Re-training the model over the complete data and forecasting
     Object.fitmodel()
@@ -100,11 +101,11 @@ elif case == 3:
     Object.setParameters(setting='manual',Parasettings = Paraset)
 
     # Fit the model over the training data and validate against the test data
-    Object.fitmodel(splitPoint=303,validate=True,printSummary=True,plotPredictions=False)
+    Object.fitmodel(splitPoint=376,validate=True,printSummary=True,plotPredictions=True)
 
-    # # Re-training the model over the complete data and forecasting
-    # Object.fitmodel(saveModel=True,modelName='TSA_model5') 
-    # Forecast_results = Object.forecast(steps=12,plotForecast=True)
+    # Re-training the model over the complete data and forecasting
+    Object.fitmodel(saveModel=True,modelName='TSA_model5') 
+    Forecast_results = Object.forecast(steps=12,plotForecast=True)
 
 elif case==4:
 # Loading a LSTM based model and forecasting using such a model
