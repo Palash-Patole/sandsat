@@ -40,8 +40,18 @@ if transectName=="Transect 1":
 # plt.savefig(path_to_results+'Trend_seasonality.png', transparent = False)
 # plt.show()
 
+#%% Casuality test between two time series
+TF2 = SDS_tsa.read_timeSeries('Transect 2', plotTimeseries=False,resampling='MS')
+TF3 = SDS_tsa.read_timeSeries('Transect 3', plotTimeseries=False,resampling='MS')
+TF1 = SDS_tsa.read_timeSeries('Transect 1',resampling='MS')
+TF1.dropna(inplace=True)
+
+df=SDS_tsa.GrangerCausality(TF2,TF3,plotTimeseries=True)
+# SDS_tsa.GrangerCausality(TF1,TF2)
+# SDS_tsa.GrangerCausality(TF1,TF3)
+
 #%% Multiple ways of forecasting
-case = 3 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
+case = 0 # 1 - SARIMA based, grid search for para setting->fit->validate->fit over all data->forecast
          # 2 - SARIMA based, manual setting for parameters->fit->validate->fit over all data->forecast
          # 3 - LSTM based, manual setting for parameters->fit-validate->fit over all data->forecast
          # 4 - LSTM based, load fitted model -> forecast

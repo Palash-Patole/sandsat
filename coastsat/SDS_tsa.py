@@ -23,6 +23,8 @@ To do:
         l. [Done] Setting parameters of the LSTM model through setParameters method
         m. [Done] Extract the parameters to be set in case of SARIMA from a dictionary variable similar to the LSTM
         n. [To do] Define a method to compute casuality between two time-serieses
+        o. [To do] Remove the old way of reading a time-series data after completing b.
+        
 """
 
 # Following package installation instruction is required, if it is absent from the environment
@@ -40,6 +42,7 @@ import warnings
 import itertools
 import numpy as np
 import os
+import math
 warnings.filterwarnings("ignore")
 
 # Following is specific to spyder IDE
@@ -57,6 +60,8 @@ from keras.layers import Dense
 from keras.layers import LSTM
 from keras.models import load_model
 
+# for the Granger-causality test
+from statsmodels.tsa.stattools import grangercausalitytests
 
 #####################################################
 ########## Setting parameters for plotting ##########
@@ -221,7 +226,42 @@ def seasonal_decompose(timeSeries,model='add',plotDecomposition=False):
         plt.savefig(filePathGenerator()+'Seasonal_decomposition_'+model+'.png', transparent=False)
     return decomposed
 
+#%% 
+#####################################################
+################## Causality test ###################
+#####################################################
 
+def GrangerCausality(TS1,TS2,maxlag=12,plotTimeseries=False):
+    print("")
+    print("******************************************************************")
+    print("                   TSA: Granger Causality test                    ")
+    print("******************************************************************")
+    print("")
+        
+    # Error handling
+    assert(type(TS1)==pd.core.series.Series and type(TS2)==pd.core.series.Series), "Input arguments should be two time series objects."
+        
+    # create a dataframe from two different time series
+    DF = pd.concat([TS1, TS2], axis=1, join='inner')
+    if plotTimeseries==True:
+        fig,ax = plt.subplots()
+        DF.plot(ax=ax,title="Time series subjected to the Granger Causality tests")
+        plt.grid()
+        ax.set_ylabel('Shoreline location [m]') 
+        ax.set_xlabel('')
+
+
+    # Running the test on the two columns of the dataframe
+    col1 = DF.columns[0]
+    col2 = DF.columns[1]
+    print("The Granger casuality test is performed for the columns: ",col1, " and ", col2)
+    result = grangercausalitytests(DF[[col1,col2]],maxlag=maxlag);
+    
+    return result 
+        
+    
+        
+        
 #%%
 #####################################################
 ######### Class for time series analysis ############
